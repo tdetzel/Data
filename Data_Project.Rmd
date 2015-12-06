@@ -1,0 +1,296 @@
+---
+title: "Project — Detzel"
+author: "Tom Detzel"
+date: "October 4, 2015"
+output: html_document
+---
+
+
+```{r include=TRUE, cache=TRUE}
+# DO NOT REMOVE
+# THIS IS FOR SETTING SOME PLOTTING PARAMETERS SO THAT YOUR PLOTS DON'T TAKE UP TOO MUCH SPACE
+# IF YOU WOULD LIKE TO CHANGE THESE, SEE HELP FILES ON THE par() FUNCTION
+# OR ASK FOR HELP
+library(knitr)
+## set global chunk options
+opts_chunk$set(fig.path='figure/manual-', cache.path='cache/manual-', fig.align='center', fig.show='hold', par=TRUE)
+## tune details of base graphics (http://yihui.name/knitr/hooks)
+knit_hooks$set(par=function(before, options, envir){
+if (before && options$fig.show!='none') par(mar=c(4,4,.2,.1),cex.lab=.95,cex.axis=.9,mgp=c(2,.7,0),tcl=-.3)
+})
+```
+
+```{r eval=TRUE, echo=FALSE, warnings=FALSE}
+
+library(dplyr)
+
+##if(!file.exists("Data")){dir.create("Data")}
+##fileurl <- "https://github.com/tdetzel/Data/blob/master/hpoa"
+##download.file(fileurl, destfile = "./Data/hpoa", mode="wb", method = "curl")
+
+getwd()
+# load data
+load("./Data/hpoa")
+
+```
+
+### Research question 
+  
+**Q. Are some hospitals underreporting patient harm to gain an advantage in Medicare reimbursements?**
+  
+Background: Under the government's [Hospital Acquired Condition Reduction Program](https://www.cms.gov/Outreach-and-Education/Medicare-Learning-Network-MLN/MLNProducts/Downloads/wPOAFactSheet.pdf), acute-care hospitals that report a large number of preventable patient harms -- Hospital Acquired Conditions -- face a financial penalty in the form of Medicare reimbursement reductions. Hospitals are rated on their performance for based on the hospitals' own reporting of whether diagnostic coditions were Present on Admission or not. [According to Medicare.gov](https://www.cms.gov/Medicare/Medicare-Fee-for-Service-Payment/HospitalAcqCond/Downloads/Accuracy-of-coding-Final-Report.pdf): "In October 2014, CMS (the Center for Medicare and Medicaid Services) began reducing Medicare payments for (acute care) that rank in the worst performing quartile with respect to hospital-acquired conditions (HACs). Hospitals with a Total HAC Score above the 75th percentile of the Total HAC Score distribution may be subject to the payment reduction." Last year, Medicare reduced payments for more than 700 hospitals by an estimated $300 million.
+  
+The HAC reduction program [has been controversial](http://www.ncbi.nlm.nih.gov/pubmed/21602197) in part because it relies on the accuracy of self-reported hospital diagnosis codes. Small studies have explored the frequency in which hospitals erred by failing to failure to underreport -- i.e., failing to report a HAC when it existed -- and to overreport -- i.e., coding conditions as Present on Admission when it was not. In a [2011 study of California hospitals](http://www.ncbi.nlm.nih.gov/pubmed/22092023), Goldman, et al, stated that, "Hospitals concerned about publicly reported quality assessments based on risk-adjusted models from administrative data could “over-report” diagnoses as present on admission to make their patients appear sicker and thereby improve their publicly reported risk-adjusted mortality rates."
+
+### Cases 
+  
+This analysis will rely on aggregate data from the state of Florida, which along with more than 40 other states submits hospital billing data to CMS each year. These files contain a record for each inpatient stay at every hospital in participating states. Patient-level data is anonymized for privacy reasons and contains fields for up to 30 diagnosis and procedure codes, plus matching fields indicating when a specific diagnosis is Present on Admission [(Y, N, or Unknown)](https://www.cms.gov/Medicare/Medicare-Fee-for-Service-Payment/HospitalAcqCond/Coding.html). Patient attributes include age, gender, race, primary and diagnoses, length of stay, source of admission, payer (Medicare, Medicaid, private insurance, etc.) and total charges. The data will be merged with a separate CMS file of hospital characteristics so that results can be compared between groups such as for-profit, nonprofit and teaching hositals.
+
+### Data collection 
+  
+The raw data were obtained from Florida under a public records request. Raw data (~900,000 rows x 192 variables) are filtered to prepare a smaller analytical data set of 212 hospitals with more than 500 Medicare fee-for-service discharges and explanatory and dependent variables aggregated to the hospital level. This tidy analytical table will be available for download at [github/tdetzel/Data](https://github.com/tdetzel/Data). The data dictionary is [here](https://www.cms.gov/Research-Statistics-Data-and-Systems/Files-for-Order/LimitedDataSets/Downloads/InpatientVersionJ2011.pdf).
+
+(A code chunk documenting the data preparation is provided below.) 
+
+### Type of study 
+  
+**What type of study is this (observational/experiment)?**  
+  
+This is an observational study based on administrative billing records that hospitals submit for reimbursement under Medicare's fee-for-service inpatient hospital payment system.
+
+
+### Data Source 
+  
+**See Data Collection above. Each row in the analytical file, hpoa, describes a unique Florida hospital, identifies its type (for-profit, non-profit) and summarizes patient and HAC coding. The variables in this data set are:**
+
+Variable   | Attribute
+---------- | ------------------------------------------------------------   
+faclnbr    | Unique hospital ID used by Medicare
+Hospital   | Hospital name
+City       | Hospital city
+Beds       | Licensed number of beds
+Status     | Hospital is For-profit or Non-profit
+discharges | Total number of discharges in 2010
+losDays    | Mean patient length of stay in days
+sexM       | Percent of male patients
+avgAge     | Mean patient age
+tchgs      | Total charges for these patients in 2010
+totW       | Total patients race = white
+raceW      | Percent patients race = white
+totB       | Total patients race = African American
+raceB      | Percent patients race = African American
+poaE       | Count of diagnoses exempt from poa reporting
+poaN       | Count of diagnoses that were NOT present on admission (HACs)
+poaU       | Count of diagnosies without information
+poaW       | Count of clinically undetermined cases
+poaY       | Count of diagnoses that were present on admission
+poaAnyN    | Count of cases with at least one diagnosis not POA
+diagCount  | Count of all diagnoses
+poaCount   | Count of all POA codes
+pctHAC     | Percent of discharges with at least one HAC
+
+  
+### Response 
+
+**What is the response variable, and what type is it (numerical/categorical)?**
+
+The primary response variable is Total Hospital Charges. Other response variables may also be tested to determine the predictive power of different measures of coding compliance combined with hospital attributes such as for-profit/non-profit status, racial makeup, bedsize and patient volume.
+
+
+### Explanatory 
+
+**What is the explanatory variable, and what type is it (numerical/categorical)?**
+
+Several measures of hospital coding compliance will be computed, including ratios for Present on Admission diagnoses and Hospital Acquired Conditions. These will be combined with other explanatory variables to establish the effect of coding compliance on Total Hospital Charges.
+
+
+### Relevant summary statistics 
+
+**Provide summary statistics relevant to your research question. For example, if you’re comparing means across groups provide means, SDs, sample sizes of each group. This step requires the use of R, hence a code chunk is provided below. Insert more code chunks as needed.**
+
+
+####White vs. Black Hospitals  
+  
+  
+#####All Hospitals
+```{r eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  summarize(Hospitals = n_distinct(faclnbr), 'Beds' = sum(Beds), 'Mean Age' = round(mean(avgAge),2), 'Pct White' = round(mean(raceW), 2), 'Pct Black' = round(mean(raceB),2), 'Patients' = sum(discharges), 'HAC Cases' = sum(poaAnyN), 'Pct HACs' = (round(sum(poaAnyN)/sum(discharges), 3)*100))
+```
+  
+#####Majority White Patients  
+  
+```{r eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  filter(raceW > .5) %>%
+  summarize(Hospitals = n_distinct(faclnbr), 'Beds' = sum(Beds), 'Mean Age' = round(mean(avgAge),2), 'Pct White' = round(mean(raceW), 2), 'Pct Black' = round(mean(raceB),2), 'Patients' = sum(discharges), 'HAC Cases' = sum(poaAnyN), 'Pct HACs' = (round(sum(poaAnyN)/sum(discharges), 3)*100))
+```
+  
+#####Majority African American Patients  
+  
+```{r eval=TRUE, echo=FALSE}
+ungroup(hpoa)%>%
+  filter(raceB > .5) %>%
+  summarize(Hospitals = n_distinct(faclnbr), 'Beds' = sum(Beds), 'Mean Age' = round(mean(avgAge),2), 'Pct White' = round(mean(raceW), 2), 'Pct Black' = round(mean(raceB),2), 'Patients' = sum(discharges), 'HAC Cases' = sum(poaAnyN), 'Pct HACs' = (round(sum(poaAnyN)/sum(discharges), 3)*100))
+```
+
+####For-Profit vs. Non-Profit  
+
+#####Size and Volume  
+  
+```{r, eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  group_by(Status) %>%
+  summarize(Hospitals = n_distinct(faclnbr), 'Beds' = sum(Beds), 'Mean Age' = round(mean(avgAge),2), 'Pct White' = round(mean(raceW), 2), 'Pct Black' = round(mean(raceB),2), 'Patients' = sum(discharges))
+```
+
+#####Hospital Charges  
+  
+```{r, eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  group_by(Status)%>%
+  summarize('Mean Beds' =round(mean(Beds),2), 'StDev Beds' = round(sd(Beds), 2), 'Total Charges' = sum(tchgs), 'Charges per Bed'=round(sum(tchgs)/sum(Beds), 3))
+```
+ 
+#####Hospital-Acquired Conditions (HACs)  
+  
+```{r, eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  group_by(Status) %>%
+  summarize( 'HAC Cases' = sum(poaAnyN), 'Pct HACs' = (round(sum(poaAnyN)/sum(discharges), 3)*100), 'Mean HACs' = round(mean(poaN), 2), 'StDev HACs' = round(sd(poaN), 2))
+```
+
+
+#####Coding Accuracy  
+  
+```{r, eval=TRUE, echo=FALSE}
+
+ungroup(hpoa)%>%
+  group_by(Status)%>%
+  summarize('HAC Ratio (%N of all)' = round(sum(poaN)/sum(poaCount),4), 'Missing Codes (%)' = 1-round(sum(poaCount)/sum(diagCount),4))
+
+```
+  
+    
+    
+####Variation in Reporting HACs  
+  
+  
+```{r, eval=TRUE, echo=FALSE}
+
+plot.new()
+hist(hpoa$pctHAC, freq=T, breaks=30, col="lightblue", las=1, cex.axis=0.7, main="", xlab='HAC Cases as Percent of Discharges', ylab="Count of Hospitals Reporting", ylim=c(0, 25), cex.main=1.2)
+curve(dnorm(x, mean = mean(hpoa$pctHAC), sd = sd(hpoa$pctHAC)), add = T, col="red", lwd=2)
+abline(v=mean(hpoa$pctHAC), lty=3, lwd=2, col="blue")
+grid(NA, NULL, lwd=1.2)
+text(.5, 16, adj=c(0,0), paste(" Mean = ", round(mean(hpoa$pctHAC),2), "\n", "StDev = ", round(sd(hpoa$pctHAC), 2), "\n", "IQR = ", round(IQR(hpoa$pctHAC), 2), "\n", "N reporting 0 = ", length(which(hpoa$pctHAC==0))))
+
+```
+
+####Data Peparation Code  
+  
+The data in the analytical table *hpao* is aggregated from a larger table of approximately 1.5 million hospital admissions in Florida in 2010. The table includes 192 variables and is too big to include here. The data dictionary [can be found here](https://www.cms.gov/Research-Statistics-Data-and-Systems/Files-for-Order/LimitedDataSets/Downloads/InpatientVersionJ2011.pdf).
+
+Data were filtered using Postgres SQL to a smaller set of ~ 880,000 admissions paid for by Medicare at hospitals with more than 500 admissions. That table was imported to R and manipulated to group and aggregate counts for the variables used in this analysis.
+
+
+```{r eval=FALSE, echo=TRUE}
+
+## get raw florida discharge data pre-produced in sql
+## 
+file1 <- "/Users/tjd/Documents/R/IS606/Project/Data/fla2010.csv"
+fla <- fread(file1, colClasses = "character", header=T)
+
+## set variable types
+## 
+fla <- data.frame(fla)
+names(fla)
+fla[, c(1:15, 17:126, 184:192)] <- lapply(fla[, c(1:15, 17:126, 184:192)], as.factor)
+fla[, c(16,183)] <- as.numeric(unlist(fla[, c(16,183)]))
+str(fla)
+
+## get hospital info
+## 
+file3 <- "/Users/tjd/Documents/R/IS606/Project/Data/flainfo.csv"
+flainfo <- fread(file3, colClasses = "character", header=T)
+flainfo[, 24] <- as.numeric(flainfo[, 24])
+flainfo <- data.frame(flainfo)
+
+## make variables with count of values in fla table
+x <- c('', 'E','N','U','W','Y')
+
+fla$na <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='')))
+fla$E <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='E')))
+fla$N <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='N')))
+fla$U <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='U')))
+fla$W <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='W')))
+fla$Y <- apply(fla[,58:88],1,FUN=function(x) length(which(x=='Y')))
+fla$anyN <- apply(fla[,58:88],1, FUN=function(x) ifelse(any(x=='N'), 1, 0))
+fla$diagCnt <- apply(fla[,27:57],1,FUN=function(x) length(which(x!='')))
+fla$poaCnt<- apply(fla[,59:88],1,FUN=function(x) length(which(x!='')))
+
+## check that column totals match data dimensions
+sum(apply(fla[, c(193:198)], 2, sum))
+dim(fla[, 59:88])[1] * dim(fla[, 59:88])[2]
+
+## make tbl_df for easy aggregation
+fla <- tbl_df(fla)
+
+## create analytical table
+## 
+poasum <- ungroup(fla)%>%
+  group_by(faclnbr)%>%
+  summarize(
+    discharges = length(faclnbr),
+    losDays = round(mean(losdays, na.rm=TRUE), 2),
+    sexM = round(length(which(sex=='M'))/discharges,2),
+    avgAge = round(mean(age), 2),
+    tchgs = sum(tchgs),
+    totW = length(which(race=='5')),
+    raceW = round(length(which(race=='5'))/length(race),2),
+    totB = length(which(race=='3')),
+    raceB = round(length(which(race=='3'))/length(race),2),
+    poaE = sum(E),
+    poaN = sum(N),
+    poaU = sum(U),
+    poaW = sum(W),
+    poaY = sum(Y),
+    poaN = sum(N),
+    poaAnyN = sum(anyN),
+    diagCount = sum(diagCnt),
+    poaCount = sum(poaCnt)
+)
+
+## make it a data frame so we can merge with flainfo
+## 
+poasum <- data.frame(poasum)
+
+## merge tables
+## 
+hpoa <- merge(flainfo[, c(1,6,16,24,25)], poasum, by.x="AHCA.Number..File.Number.", by.y="faclnbr", all.y=TRUE)
+
+## fix names
+## 
+names(hpoa)[1:5] <- c("faclnbr", "Hospital", "City", "Beds", "Status")
+
+## make analytical table a tbl_df for easy aggregation
+## 
+hpoa<- tbl_df(hpoa)
+
+## add one missing hospital ID (hospital has since closed)
+## 
+hpoa[143, c(2,3,4,5)] <- c("EDWARD WHITE HOSPITAL", "ST PETERSBURG", "162", "For-Profit")
+
+save(hpoa, file="hpoa")
+list.files()
+getwd()
+
+
+```
+
+
